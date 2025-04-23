@@ -1,0 +1,88 @@
+<!-- filepath: index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat</title>
+</head>
+<body>
+  <div>
+    <strong>Users:</strong>
+    <ul id="userList"></ul>
+  </div>
+  <ul id="messages"></ul>
+  <form id="form" action="">
+    <select id="recipient">
+      <option value="">Everyone (public)</option>
+    </select>
+    <input id="input" autocomplete="off" /><button>Send</button>
+  </form>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var socket = io();
+    var form = document.getElementById('form');
+    var input = document.getElementById('input');
+    var messages = document.getElementById('messages');
+    var userList = document.getElementById('userList');
+    var recipient = document.getElementById('recipient');
+    var username = '';
+
+    // Prompt for username
+    while (!username) {
+      username = prompt('Enter your name:');
+    }
+    socket.emit('register', username);
+
+    // Update user list and recipient dropdown
+    socket.on('user list', function(users) {
+      userList.innerHTML = '';
+      recipient.innerHTML = '<option value="">Everyone (public)</option>';
+      Object.entries(users).forEach(([id, name]) => {
+        var li = document.createElement('li');
+        li.textContent = name + (socket.id === id ? " (You)" : "");
+        userList.appendChild(li);
+
+        if (socket.id !== id) {
+          var option = document.createElement('option');
+          option.value = id;
+          option.textContent = name;
+          recipient.appendChild(option);
+        }
+      });
+    });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (input.value) {
+        if (recipient.value) {
+          // Private message
+          socket.emit('private message', { to: recipient.value, from: username, text: input.value });
+          var item = document.createElement('li');
+          item.textContent = 'To [' + recipient.options[recipient.selectedIndex].text + ']: ' + input.value;
+          item.style.fontStyle = 'italic';
+          messages.appendChild(item);
+        } else {
+          // Public message
+          socket.emit('chat message', { user: username, text: input.value });
+        }
+        input.value = '';
+      }
+    });
+
+    socket.on('chat message', function(msg) {
+      var item = document.createElement('li');
+      item.textContent = msg.user + ': ' + msg.text;
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    socket.on('private message', function(msg) {
+      var item = document.createElement('li');
+      item.textContent = '[Private] ' + msg.from + ': ' + msg.text;
+      item.style.fontWeight = 'bold';
+      item.style.color = 'blue';
+      messages.appendChild(item);
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+  </script>
+</body>
+</html>
